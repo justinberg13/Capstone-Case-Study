@@ -1,0 +1,86 @@
+install.packages("tidyverse")
+install.packages("plyr")
+install.packages("dplyr")
+install.packages("tidyverse")
+library(plyr)
+library(dplyr)
+library(tidyverse)
+
+a <- dir('fitbit_data/', full.names = T)
+fitbitlist <- lapply(a, read.csv)
+df <- fitbitlist[[1]]
+tail(df[,15], 40)
+tail(fitbitlist[[2]][,3], 40)
+agg1 <- aggregate(df$Calories, by=list(df$Id), FUN=sum)
+
+agg1[order(-agg$x),]
+
+df$Weekday <- weekdays(as.Date(df$ActivityDate, "%m/%d/%Y"))
+agg1 <- aggregate(cbind(df$Calories, df$TotalSteps, df$VeryActiveMinutes), by=list(df$Weekday), FUN=sum, na.rm=T)
+aggb<- agg1[order(-agg1$V1),]
+ggplot(b, aes(x=Group.1, y=x)) + geom_bar(stat="identity")
+write.csv(aggb, "daily.csv", row.names = FALSE)
+## Hourly Data Set
+
+hourly.df <- join_all(list(fitbitlist[[6]],fitbitlist[[7]],fitbitlist[[8]]),by=c("Id", "ActivityHour"), type="full")
+
+## Modifying the ActivityHour Column 
+hourly.df$ActivityHour<- strptime(hourly.df$ActivityHour,format="%m/%d/%Y %I:%M:%S %p")
+hourly.df$Hour <- format(hourly.df$ActivityHour, format="%H:%M:%S")
+head(hourly.df)
+hourly.df$Weekday <- weekdays(as.Date(hourly.df$ActivityHour, "%m/%d/%Y"))
+agg2 <- aggregate(hourly.df$Calories, by=list(hourly.df$Weekday), FUN=sum, na.rm=T)
+agg3 <- aggregate(hourly.df$Calories, by=list(hourly.df$Id, hourly.df$Weekday, hourly.df$Hour), FUN=sum, na.rm=T)
+
+ hourly.df3 <- hourly.df %>% mutate(
+  TimeOfDay = ifelse(hourly.df$Hour >="04:00:00"&hourly.df$Hour<="07:00:00","EarlyMorning",
+                     ifelse(hourly.df$Hour >="08:00:00"&hourly.df$Hour<="11:00:00","Morning",
+                            ifelse(hourly.df$Hour >="12:00:00"&hourly.df$Hour<="15:00:00","Afternoon",
+                                   ifelse(hourly.df$Hour >="16:00:00"&hourly.df$Hour<="19:00:00","Evening",
+                                          ifelse(hourly.df$Hour >="20:00:00"&hourly.df$Hour<="23:00:00","Night",
+                                                 "LateNight"))))))
+##Aggregated by 6 rows 
+agg5 <- aggregate(hourly.df3$Calories, by= list(hourly.df3$TimeOfDay), FUN=sum, na.rm=T)
+agg6 <- aggregate(hourly.df3$StepTotal, by= list(hourly.df3$TimeOfDay), FUN=sum, na.rm=T)
+agg7 <- aggregate(hourly.df3$TotalIntensity, by= list(hourly.df3$TimeOfDay), FUN=sum, na.rm=T)
+agg4 <- aggregate(cbind(hourly.df3$Calories,hourly.df3$StepTotal,hourly.df3$TotalIntensity), by=list(hourly.df3$TimeOfDay), FUN=sum, na.rm=T)
+
+minutedf <- join_all(list(fitbitlist[[10]],fitbitlist[[12]],fitbitlist[[16]]),by=c("Id","ActivityHour"), type="full")
+##Calorie 
+calorie_minute <- fitbitlist[[10]]
+calorie_minute2 <- as.data.frame(sapply(minutedf[,3:62], function(x){(x >= 6)}))
+calorie_minute3 <- calorie_minute2 %>%
+  add_column(Id = calorie_minute$Id, ActivityHour = calorie_minute$ActivityHour,
+             .before = "Calories00") 
+calorie_minute3$sum_minute <- rowSums(calorie_minute3[,3:62]) 
+calorie_minute3$percent_workout <- rowSums(calorie_minute3[,3:62]) /60
+calorie_minute3$ActivityHour<- strptime(calorie_minute3$ActivityHour,format="%m/%d/%Y %I:%M:%S %p")
+calorie_minute3$Hour <- format(calorie_minute3$ActivityHour, format="%H:%M:%S")
+agg10 <- aggregate(calorie_minute3$percent_workout, by=list(calorie_minute3$Hour), FUN=sum)
+write.csv(agg10, "mincalories.csv", row.names = FALSE)
+##Steps 
+steps_minute <- fitbitlist[[16]]
+steps_minute2 <- as.data.frame(sapply(minutedf[,123:182], function(x){(x >= 100)}))
+steps_minute3 <- steps_minute2 %>%
+  add_column(Id = steps_minute$Id, ActivityHour = steps_minute$ActivityHour,
+             .before = "Steps00") 
+steps_minute3$sum_minute <- rowSums(steps_minute3[,3:62]) 
+steps_minute3$percent_workout <- rowSums(steps_minute3[,3:62]) /60
+steps_minute3$ActivityHour<- strptime(steps_minute3$ActivityHour,format="%m/%d/%Y %I:%M:%S %p")
+steps_minute3$Hour <- format(steps_minute3$ActivityHour, format="%H:%M:%S")
+agg11 <- aggregate(steps_minute3$percent_workout, by=list(steps_minute3$Hour), FUN=sum)
+##Intensities  
+intesities_minute <- fitbitlist[[12]]
+intensities_minute2 <- as.data.frame(sapply(minutedf[,63:122], function(x) {x == 3}))
+as.data.frame(sapply(intensities_minute[,3:62], function(x) {sum(x >= 3)}))
+intensities_minute3 <- intensities_minute2 %>%
+  add_column(Id = intensities_minute$Id, ActivityHour = intensities_minute$ActivityHour,
+             .before = "Intensity00") 
+intensities_minute3$sum_minute <- rowSums(intensities_minute3[,3:62]) 
+intensities_minute3$percent_workout <- rowSums(intensities_minute3[,3:62]) /60
+intensities_minute3$ActivityHour<- strptime(intensities_minute3$ActivityHour,format="%m/%d/%Y %I:%M:%S %p")
+intensities_minute3$Hour <- format(intensities_minute3$ActivityHour, format="%H:%M:%S")
+agg12 <- aggregate(intensities_minute3$percent_workout, by=list(intensities_minute3$Hour), FUN=sum)
+write.csv(agg12,"minintensities.csv", row.names = FALSE)
+
+##End of Code
